@@ -1,123 +1,53 @@
 name: Build Noor AI APK
-
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
-
+on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-
-      - name: Install Android SDK
+      - name: Install Cordova and Build Noor AI App
         run: |
-          sudo apt-get update
-          sudo apt-get install -y android-sdk
-          echo "ANDROID_HOME=/usr/lib/android-sdk" >> $GITHUB_ENV
-
-      - name: Install Cordova
-        run: npm install -g cordova
-
-      - name: Create Cordova project
-        run: |
+          npm install -g cordova
           cordova create noor_app com.noor.ai "نور AI"
           cd noor_app
-          cordova platform add android@latest
-
-      - name: Copy index.html to www
-        run: |
-          cp index.html noor_app/www/index.html
-
-      - name: Copy icon
-        run: |
-          mkdir -p noor_app/res
-          if [ -f .github/workflows/icon.png ]; then
-            cp .github/workflows/icon.png noor_app/res/icon.png
-          else
-            # أيقونة افتراضية إذا لم تكن موجودة
-            echo "⚠️ icon.png غير موجودة، سيتم استخدام أيقونة افتراضية"
-          fi
-
-      - name: Generate splash screen (transparent)
-        run: |
-          echo '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"></vector>' > noor_app/res/transparent_splash.xml
-
-      - name: Create config.xml
-        run: |
-          cd noor_app
-          cat > config.xml << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <widget id="com.noor.ai" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
-              <name>نور AI</name>
-              <description>مساعد ذكي متعدد النماذج</description>
-              <author email="support@noor.ai" href="https://noor.ai">Noor AI Team</author>
-              <content src="index.html" />
-              
-              <access origin="*" />
-              <allow-navigation href="*" />
-              <allow-intent href="http://*/*" />
-              <allow-intent href="https://*/*" />
-              
-              <preference name="Orientation" value="portrait" />
-              <preference name="Fullscreen" value="false" />
-              <preference name="StatusBarBackgroundColor" value="#0f0f0f" />
-              <preference name="StatusBarStyle" value="lightcontent" />
-              <preference name="loadUrlTimeoutValue" value="60000" />
-              
-              <!-- شاشة البداية -->
-              <preference name="AndroidWindowSplashScreenBackground" value="#0f0f0f" />
-              <preference name="AndroidWindowSplashScreenAnimatedIcon" value="res/transparent_splash.xml" />
-              <preference name="AndroidWindowSplashScreenIconBackgroundColor" value="#0f0f0f" />
-              
-              <!-- أيقونة التطبيق -->
-              <platform name="android">
-                  <icon src="res/icon.png" />
-              </platform>
-              
-              <!-- الإذن بالإنترنت -->
-              <plugin name="cordova-plugin-inappbrowser" spec="*" />
-              <plugin name="cordova-plugin-whitelist" spec="*" />
-              <plugin name="cordova-plugin-statusbar" spec="*" />
-              
-          </widget>
-          EOF
-
-      - name: Install Cordova plugins
-        run: |
-          cd noor_app
+          cordova platform add android
           cordova plugin add cordova-plugin-inappbrowser
-          cordova plugin add cordova-plugin-whitelist
-          cordova plugin add cordova-plugin-statusbar
-
-      - name: Build APK
-        run: |
-          cd noor_app
-          cordova build android --release -- --packageType=apk
-
-      - name: Upload APK
+          mkdir -p res
+          if [ -f ../.github/workflows/icon.png ]; then cp ../.github/workflows/icon.png res/icon.png; fi
+          echo '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"></vector>' > res/transparent_splash.xml
+          
+          echo '<widget id="com.noor.ai" version="1.0.0" xmlns="http://www.w3.org/ns/widgets">' > config.xml
+          echo '    <name>نور AI</name>' >> config.xml
+          echo '    <description>مساعد ذكي متعدد النماذج</description>' >> config.xml
+          echo '    <author>Noor AI Team</author>' >> config.xml
+          echo '    <content src="index.html" />' >> config.xml
+          echo '    <access origin="*" />' >> config.xml
+          echo '    <allow-navigation href="*" />' >> config.xml
+          echo '    <allow-intent href="http://*/*" />' >> config.xml
+          echo '    <allow-intent href="https://*/*" />' >> config.xml
+          echo '    <preference name="Orientation" value="portrait" />' >> config.xml
+          echo '    <preference name="loadUrlTimeoutValue" value="300000" />' >> config.xml
+          echo '    <preference name="AndroidWindowSplashScreenBackground" value="#0f0f0f" />' >> config.xml
+          echo '    <preference name="AndroidWindowSplashScreenAnimatedIcon" value="res/transparent_splash.xml" />' >> config.xml
+          echo '    <preference name="AndroidWindowSplashScreenIconBackgroundColor" value="#0f0f0f" />' >> config.xml
+          echo '    <platform name="android"><icon src="res/icon.png" /></platform>' >> config.xml
+          echo '</widget>' >> config.xml
+          
+          # نسخ ملف index.html الأصلي
+          cp ../index.html www/index.html
+          
+          cordova build android --device
+      - name: Upload Noor AI APK
         uses: actions/upload-artifact@v4
         with:
           name: NoorAI-APK
-          path: noor_app/platforms/android/app/build/outputs/apk/release/*.apk
-
-      - name: Upload debug APK (fallback)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: NoorAI-Debug-APK
           path: noor_app/platforms/android/app/build/outputs/apk/debug/*.apk
